@@ -1,0 +1,10 @@
+{
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.143",
+    "@types/aws-sdk": "^0.0.42",
+    "@types/node": "^22.4.1"
+  },
+  "dependencies": {
+    "tsc": "^2.0.4"
+  }
+}

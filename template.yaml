@@ -1,0 +1,107 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Room Booking System Backend
+
+Globals:
+  Function:
+    Timeout: 10  # Increase the timeout to 10 seconds (or more, as needed)
+    MemorySize: 512  # Increase memory size if required
+
+Resources:
+  BookingApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Prod
+      Cors:
+        AllowMethods: "'DELETE,GET,HEAD,OPTIONS,PATCH,POST,PUT'"
+        AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,Origin,Accept,Access-Control-Allow-Origin'"
+        AllowOrigin: "'*'"
+
+  BookingFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: app.handler
+      Runtime: nodejs16.x
+      Environment:
+        Variables:
+          ROOM1_TABLE: !Ref QMB1
+          ROOM2_TABLE: !Ref QMB2
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref QMB1
+        - DynamoDBCrudPolicy:
+            TableName: !Ref QMB2
+      Events:
+        GetSlots:
+          Type: Api
+          Properties:
+            Path: /getSlots
+            Method: get
+            RestApiId: !Ref BookingApi
+        GetAvailableSlots:
+          Type: Api
+          Properties:
+            Path: /getAvailableSlots
+            Method: get
+            RestApiId: !Ref BookingApi
+        BookSlot:
+          Type: Api
+          Properties:
+            Path: /bookSlot
+            Method: post
+            RestApiId: !Ref BookingApi
+        Options:
+          Type: Api
+          Properties:
+            Path: /{proxy+}
+            Method: options
+            RestApiId: !Ref BookingApi
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: "es2020"
+        Sourcemap: true
+        EntryPoints: 
+        - app.ts
+
+  # DynamoDB Table for Room 1
+  QMB1:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: QMB1
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: BookingID
+          AttributeType: N
+        - AttributeName: Date
+          AttributeType: S  # String type for Date
+      KeySchema:
+        - AttributeName: BookingID
+          KeyType: HASH  # Partition key
+        - AttributeName: Date
+          KeyType: RANGE  # Sort key
+
+  # DynamoDB Table for Room 2
+  QMB2:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: QMB2
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: BookingID
+          AttributeType: N
+        - AttributeName: Date
+          AttributeType: S  # String type for Date
+      KeySchema:
+        - AttributeName: BookingID
+          KeyType: HASH  # Partition key
+        - AttributeName: Date
+          KeyType: RANGE  # Sort key
+
+Outputs:
+  BookingApiUrl:
+    Description: "API Gateway endpoint URL for Prod stage"
+    Value: !Sub "https://${BookingApi}.execute-api.${AWS::Region}.amazonaws.com/Prod"
