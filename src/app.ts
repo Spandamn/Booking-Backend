@@ -155,6 +155,7 @@ const generateBookingID = async (tableName: string): Promise<number> => {
 
 const getAvailableSlotsFromItems = (items: DynamoDB.DocumentClient.ItemList | undefined) => {
   const bookedSlots = items?.map((item) => item.Slot) || [];
-  const allSlots = Array.from({ length: 24 }, (_, i) => i + 1); // Assuming 24 slots
+  const allSlots = Array.from({ length: 16 }, (_, i) => i + 1); // Correcting to 16 slots for 8:00 AM - 11:00 PM
   return allSlots.filter(slot => !bookedSlots.includes(slot));
 };
+
