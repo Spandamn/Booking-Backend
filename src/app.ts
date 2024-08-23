@@ -126,7 +126,8 @@ const bookSlot = async (roomName: string, booking: { Slot: number; Email: string
 
     await dynamoDb.put(params).promise();
 
-    await sendBookingConfirmationEmail(booking.Email, roomName, booking.Slot, booking.Date);
+    // Send confirmation email
+    await sendConfirmationEmail(booking.Email, booking);
 
     return {
       statusCode: 200,
@@ -162,22 +163,47 @@ const getAvailableSlotsFromItems = (items: DynamoDB.DocumentClient.ItemList | un
   return allSlots.filter(slot => !bookedSlots.includes(slot));
 };
 
-const sendBookingConfirmationEmail = async (email: string, roomName: string, slot: number, date: string) => {
-  const params = {
+const sendConfirmationEmail = async (email: string, booking: { Slot: number; Email: string; Date: string }) => {
+  const params: SES.SendEmailRequest = {
+    Source: 'your-email@example.com', // Replace with your verified SES email
     Destination: {
       ToAddresses: [email],
     },
     Message: {
+      Subject: {
+        Data: `Booking Confirmation for ${booking.Date}`,
+      },
       Body: {
-        Text: {
-          Data: `Your booking for Room: ${roomName} on ${date} for slot ${slot} has been confirmed.`,
+        Html: {
+          Data: `
+            <div style="font-family: Arial, sans-serif; line-height: 1.5;">
+              <div style="background-color: #4CAF50; color: white; padding: 10px; text-align: center;">
+                <h1>Booking Confirmation</h1>
+              </div>
+              <div style="padding: 20px;">
+                <p>Dear Customer,</p>
+                <p>Your booking has been confirmed with the following details:</p>
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <th style="text-align: left; padding: 8px; background-color: #f2f2f2;">Date</th>
+                    <td style="padding: 8px;">${booking.Date}</td>
+                  </tr>
+                  <tr>
+                    <th style="text-align: left; padding: 8px; background-color: #f2f2f2;">Time Slot</th>
+                    <td style="padding: 8px;">${booking.Slot + 7}:00 - ${booking.Slot + 8}:00</td>
+                  </tr>
+                </table>
+                <p>If you  would like to change ypour booking, please reply to this email, and one of our staff will get back to you.</p>
+                <p>Thank you for your booking!</p>
+              </div>
+              <div style="background-color: #4CAF50; color: white; padding: 10px; text-align: center;">
+                <p>&copy; 2024 Spandank Technologies</p>
+              </div>
+            </div>
+          `,
         },
       },
-      Subject: {
-        Data: 'Room Booking Confirmation',
-      },
     },
-    Source: 'qmbuod',
   };
 
   await ses.sendEmail(params).promise();
