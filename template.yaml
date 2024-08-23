@@ -1,12 +1,12 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  Room Booking System Backend
+  Room Booking System Backend with Email Notification
 
 Globals:
   Function:
-    Timeout: 10  # Increase the timeout to 10 seconds (or more, as needed)
-    MemorySize: 512  # Increase memory size if required
+    Timeout: 10
+    MemorySize: 512
 
 Resources:
   BookingApi:
@@ -33,6 +33,12 @@ Resources:
             TableName: !Ref QMB1
         - DynamoDBCrudPolicy:
             TableName: !Ref QMB2
+        - Statement:
+            Effect: Allow
+            Action:
+              - "ses:SendEmail"
+              - "ses:SendRawEmail"
+            Resource: "*"
       Events:
         GetSlots:
           Type: Api
@@ -77,12 +83,12 @@ Resources:
         - AttributeName: BookingID
           AttributeType: N
         - AttributeName: Date
-          AttributeType: S  # String type for Date
+          AttributeType: S
       KeySchema:
         - AttributeName: BookingID
-          KeyType: HASH  # Partition key
+          KeyType: HASH
         - AttributeName: Date
-          KeyType: RANGE  # Sort key
+          KeyType: RANGE
 
   # DynamoDB Table for Room 2
   QMB2:
@@ -94,12 +100,12 @@ Resources:
         - AttributeName: BookingID
           AttributeType: N
         - AttributeName: Date
-          AttributeType: S  # String type for Date
+          AttributeType: S
       KeySchema:
         - AttributeName: BookingID
-          KeyType: HASH  # Partition key
+          KeyType: HASH
         - AttributeName: Date
-          KeyType: RANGE  # Sort key
+          KeyType: RANGE
 
 Outputs:
   BookingApiUrl:

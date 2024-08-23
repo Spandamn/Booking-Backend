@@ -1,7 +1,8 @@
-import { DynamoDB } from 'aws-sdk';
+import { DynamoDB, SES } from 'aws-sdk';
 import { APIGatewayEvent, APIGatewayProxyHandler } from 'aws-lambda';
 
 const dynamoDb = new DynamoDB.DocumentClient();
+const ses = new SES();
 
 const ROOM_TABLES = {
   QMB1: process.env.ROOM1_TABLE || '',
@@ -125,6 +126,8 @@ const bookSlot = async (roomName: string, booking: { Slot: number; Email: string
 
     await dynamoDb.put(params).promise();
 
+    await sendBookingConfirmationEmail(booking.Email, roomName, booking.Slot, booking.Date);
+
     return {
       statusCode: 200,
       headers: {
@@ -159,3 +162,23 @@ const getAvailableSlotsFromItems = (items: DynamoDB.DocumentClient.ItemList | un
   return allSlots.filter(slot => !bookedSlots.includes(slot));
 };
 
+const sendBookingConfirmationEmail = async (email: string, roomName: string, slot: number, date: string) => {
+  const params = {
+    Destination: {
+      ToAddresses: [email],
+    },
+    Message: {
+      Body: {
+        Text: {
+          Data: `Your booking for Room: ${roomName} on ${date} for slot ${slot} has been confirmed.`,
+        },
+      },
+      Subject: {
+        Data: 'Room Booking Confirmation',
+      },
+    },
+    Source: 'qmbuod',
+  };
+
+  await ses.sendEmail(params).promise();
+};
