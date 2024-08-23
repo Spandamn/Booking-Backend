@@ -165,8 +165,7 @@ const getAvailableSlotsFromItems = (items: DynamoDB.DocumentClient.ItemList | un
 
 const sendConfirmationEmail = async (email: string, booking: { Slot: number; Email: string; Date: string }) => {
   const params: SES.SendEmailRequest = {
-    Source: 'your-email@example.com', // Replace with your verified SES email
-    Destination: {
+    Source: 'qmbuod@gmail.com',
       ToAddresses: [email],
     },
     Message: {
