@@ -1,5 +1,6 @@
 import { DynamoDB, SES } from 'aws-sdk';
 import { APIGatewayEvent, APIGatewayProxyHandler } from 'aws-lambda';
+import { v4 as uuidv4 } from 'uuid';
 
 const dynamoDb = new DynamoDB.DocumentClient();
 const ses = new SES();
@@ -32,6 +33,9 @@ export const handler: APIGatewayProxyHandler = async (event: APIGatewayEvent) =>
     } else if (path === '/bookSlot' && method === 'POST') {
         const body = JSON.parse(event.body || '{}');
         return bookSlot(roomName, body);
+    } else if (path === '/cancelBooking' && method === 'GET') {
+        const token = event.queryStringParameters?.token;
+        return cancelBooking(token);
     } else {
         return {
             statusCode: 404,
@@ -114,6 +118,8 @@ const bookSlot = async (roomName: string, booking: { Slot: number; Email: string
     try {
         const tableName = ROOM_TABLES[roomName];
         const bookingID = await generateBookingID(tableName);
+        const cancellationToken = uuidv4();  // Generate a unique cancellation token
+
         const params = {
             TableName: tableName,
             Item: {
@@ -121,12 +127,13 @@ const bookSlot = async (roomName: string, booking: { Slot: number; Email: string
                 Slot: booking.Slot,
                 Email: booking.Email,
                 Date: booking.Date,
+                CancellationToken: cancellationToken,  // Store the cancellation token with the booking
             },
         };
 
         await dynamoDb.put(params).promise();
 
-        await sendConfirmationEmail(booking.Email, booking);
+        await sendConfirmationEmail(booking.Email, booking, cancellationToken);
 
         return {
             statusCode: 200,
@@ -142,6 +149,68 @@ const bookSlot = async (roomName: string, booking: { Slot: number; Email: string
                 "Access-Control-Allow-Origin": "*",
             },
             body: JSON.stringify({ message: 'Failed to book slot', error }),
+        };
+    }
+};
+
+const cancelBooking = async (token?: string) => {
+    if (!token) {
+        return {
+            statusCode: 400,
+            headers: {
+                "Access-Control-Allow-Origin": "*",
+            },
+            body: JSON.stringify({ message: 'Invalid cancellation token' }),
+        };
+    }
+
+    try {
+        // Directly query the DynamoDB table to find the booking using the cancellation token
+        for (const room of Object.values(ROOM_TABLES)) {
+            const params: DynamoDB.DocumentClient.QueryInput = {
+                TableName: room,
+                IndexName: 'CancellationToken-index', // Assuming a Global Secondary Index (GSI) on CancellationToken
+                KeyConditionExpression: "CancellationToken = :token",
+                ExpressionAttributeValues: { ":token": token },
+            };
+
+            const result = await dynamoDb.query(params).promise();
+            if (result.Items && result.Items.length > 0) {
+                // Delete the booking
+                const booking = result.Items[0];
+                const deleteParams: DynamoDB.DocumentClient.DeleteItemInput = {
+                    TableName: room,
+                    Key: {
+                        BookingID: booking.BookingID,
+                        Date: booking.Date,
+                    },
+                };
+                await dynamoDb.delete(deleteParams).promise();
+
+                return {
+                    statusCode: 200,
+                    headers: {
+                        "Access-Control-Allow-Origin": "*",
+                    },
+                    body: JSON.stringify({ message: 'Booking cancelled successfully' }),
+                };
+            }
+        }
+
+        return {
+            statusCode: 404,
+            headers: {
+                "Access-Control-Allow-Origin": "*",
+            },
+            body: JSON.stringify({ message: 'Booking not found for the provided token' }),
+        };
+    } catch (error) {
+        return {
+            statusCode: 500,
+            headers: {
+                "Access-Control-Allow-Origin": "*",
+            },
+            body: JSON.stringify({ message: 'Failed to cancel booking', error }),
         };
     }
 };
@@ -162,7 +231,8 @@ const getAvailableSlotsFromItems = (items: DynamoDB.DocumentClient.ItemList | un
     return allSlots.filter(slot => !bookedSlots.includes(slot));
 };
 
-const sendConfirmationEmail = async (email: string, booking: { Slot: number; Email: string; Date: string }) => {
+const sendConfirmationEmail = async (email: string, booking: { Slot: number; Email: string; Date: string }, token: string) => {
+    const cancellationLink = `${process.env.CANCEL_URL}/cancelBooking?token=${token}`;
     const params: SES.SendEmailRequest = {
         Source: 'qmbuod@gmail.com',
         Destination: {
@@ -192,7 +262,7 @@ const sendConfirmationEmail = async (email: string, booking: { Slot: number; Ema
                                         <td style="padding: 8px;">${booking.Slot + 7}:00 - ${booking.Slot + 8}:00</td>
                                     </tr>
                                 </table>
-                                <p>If you want to change your booking, please reply to this email and we will get back to you.</p>
+                                <p>If you want to change your booking, please reply to this email or <a href="${cancellationLink}">click here to cancel your booking</a>.</p>
                                 <p>Thank you for your booking!</p>
                             </div>
                             <div style="background-color: #4CAF50; color: white; padding: 10px; text-align: center;">

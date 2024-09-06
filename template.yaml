@@ -28,6 +28,7 @@ Resources:
         Variables:
           ROOM1_TABLE: !Ref QMB1
           ROOM2_TABLE: !Ref QMB2
+          CANCEL_URL: "https://main.d16zph37xouq67.amplifyapp.com/"  # Change this to your actual frontend domain
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref QMB1
@@ -40,6 +41,12 @@ Resources:
               - "ses:SendRawEmail"
             Resource: "*"
       Events:
+        CancelBooking:
+          Type: Api
+          Properties:
+            Path: /cancelBooking
+            Method: get
+            RestApiId: !Ref BookingApi
         GetSlots:
           Type: Api
           Properties:
@@ -84,11 +91,20 @@ Resources:
           AttributeType: N
         - AttributeName: Date
           AttributeType: S
+        - AttributeName: CancellationToken
+          AttributeType: S
       KeySchema:
         - AttributeName: BookingID
           KeyType: HASH
         - AttributeName: Date
           KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: CancellationToken-index
+          KeySchema:
+            - AttributeName: CancellationToken
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
 
   # DynamoDB Table for Room 2
   QMB2:
@@ -101,11 +117,20 @@ Resources:
           AttributeType: N
         - AttributeName: Date
           AttributeType: S
+        - AttributeName: CancellationToken
+          AttributeType: S
       KeySchema:
         - AttributeName: BookingID
           KeyType: HASH
         - AttributeName: Date
           KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: CancellationToken-index
+          KeySchema:
+            - AttributeName: CancellationToken
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
 
 Outputs:
   BookingApiUrl:
