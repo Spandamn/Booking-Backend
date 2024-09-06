@@ -169,7 +169,7 @@ const cancelBooking = async (token?: string) => {
         for (const room of Object.values(ROOM_TABLES)) {
             const params: DynamoDB.DocumentClient.QueryInput = {
                 TableName: room,
-                IndexName: 'CancellationToken-index', // Assuming a Global Secondary Index (GSI) on CancellationToken
+                IndexName: 'CancellationToken-index',
                 KeyConditionExpression: "CancellationToken = :token",
                 ExpressionAttributeValues: { ":token": token },
             };
